@@ -3,7 +3,6 @@
  * This is the jacobi relaxation method in gpu 
  *
  */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -11,6 +10,7 @@
 
 #define SIZE 2048
 #define BLOCK_SIZE 32
+#define NITER 1000
 
 float ratio(float*u, float ant, int iter){
 	float tmp=0.0;
@@ -23,7 +23,7 @@ float ratio(float*u, float ant, int iter){
 				tmp=u[j*SIZE+i];
 		}
 	}
-	printf(" iter=%d ratio=%f max=%f\n",iter,tmp/ant,tmp);
+	printf(" iter=%d ratio=%f ant=%f max=%f\n",iter,tmp/ant,ant,tmp);
 	return tmp;
 }
 
@@ -75,25 +75,24 @@ int main(){
 		h_u[i*SIZE+SIZE-1]=0.0;
 		h_u[SIZE*(SIZE-1)+i]=0.0;
 	}
-	/* Copiamos la memoria del host a la GPU */
+	/* Copy from host to device */
 	cudaMemcpy(d_f,h_f,size,cudaMemcpyHostToDevice);
 	cudaMemcpy(d_u,h_u,size,cudaMemcpyHostToDevice);
 	cudaMemcpy(d_u_new,h_u,size,cudaMemcpyHostToDevice);
 
-	/* Creamos el grid para el cálculo */
+	/* Grid dimension */
 	dim3 dimBlock(BLOCK_SIZE,BLOCK_SIZE);
 	dim3 dimGrid(SIZE/BLOCK_SIZE,SIZE/BLOCK_SIZE);
 	float h2=h*h;
 
-	/* Bucle principal, llamamos a JACOBI */
-	for(i=0;i<1000;i++)
+	/* Call NITER times to the jacobi method */
+	for(i=0;i<NITER;i++)
 	{
 		jacobi<<<dimGrid,dimBlock>>>(d_u_new,d_u,d_f,h2);
 		cudaDeviceSynchronize;
 		if(i%100==0){
 			cudaMemcpy(h_u, d_u_new, size, cudaMemcpyDeviceToHost);
 			ant=ratio(h_u,ant,i);
-			printf("iter=%d\n",i);
 		}
 		tmp=d_u_new;
 		d_u_new=d_u;
@@ -101,7 +100,7 @@ int main(){
 
 	}
 
-	/* Liberamos memoria */
+	/* free memory */
 	free(h_u);
 	free(h_f);
 	cudaFree(d_u_new);
